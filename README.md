@@ -661,3 +661,62 @@ manual table creation is needed. Use `just stop` to stop it without deleting dat
 The 60 test cases cover validation, retries, database saves, normalization,
 exports and monitoring. They use fixed API responses and a separate test
 database, so running them does not call CoinGecko.
+
+## 9. Example pipeline run
+
+The [examples/pipeline_run/](examples/pipeline_run/) folder contains fixed sample
+outputs and screenshots from a local run. These are committed to GitHub so you
+can inspect the result without starting the pipeline. Your prices, collection
+IDs and dashboard counts will differ.
+
+```text
+examples/pipeline_run/
+├── raw_data.jsonl
+├── processed_data.jsonl
+└── screenshots/
+    ├── raw-coingecko-responses.png
+    ├── coingecko-metrics.png
+    └── grafana-dashboard.png
+```
+
+- [Raw sample](examples/pipeline_run/raw_data.jsonl): one collection with five
+usable asset records, after validation and retries, before flattening.
+- [Processed sample](examples/pipeline_run/processed_data.jsonl): the same
+collection with only the normalized fields. Both files have the same
+`response_id`, so you can compare the input and output.
+
+Each sample contains one JSONL line. The screenshots show several collections
+and the dashboard history from the run, not just this sample collection.
+
+Live outputs are separate: `just run` creates `data/` and `logs/`, and the
+pipeline writes to `data/raw/raw_data.jsonl` and
+`data/processed/processed_data.jsonl`. Those files grow as the pipeline runs,
+so they remain ignored by Git. The files under `examples/` are not read or
+updated by the running pipeline.
+
+### Raw data in PostgreSQL
+
+`raw_coingecko_responses` keeps one row per collection, with the saved asset
+records in JSON and the collection's retrieval progress.
+
+![Raw CoinGecko collections in PostgreSQL](examples/pipeline_run/screenshots/raw-coingecko-responses.png)
+
+### Normalized data in PostgreSQL
+
+`coingecko_metrics` contains one row per asset, currency and collection, with
+typed prices, market cap, volume and timestamps. Different collections can
+contain the same price when CoinGecko returns cached data; those are separate
+observations, not duplicate saves of the same collection.
+
+DBeaver displays timestamps here in the local timezone (`+0530`). The database
+columns are timezone-aware, and exported timestamps use UTC.
+
+![Normalized CoinGecko market observations in PostgreSQL](examples/pipeline_run/screenshots/coingecko-metrics.png)
+
+### Grafana dashboard
+
+The summary cards show the current state. The charts show API, collection and
+processing outcomes over time. Counter lines return to zero when their
+application restarts; older readings remain in Prometheus history.
+
+![Grafana pipeline summary cards and history charts](examples/pipeline_run/screenshots/grafana-dashboard.png)
