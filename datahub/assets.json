@@ -1,0 +1,10 @@
+{
+  "asset_ids": [
+    "ethereum",
+    "bitcoin",
+    "solana",
+    "usd-coin",
+    "tether"
+  ],
+  "quote_currency": "usd"
+}

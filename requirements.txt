@@ -1,0 +1,5 @@
+requests==2.34.2
+psycopg[binary]==3.2.13
+python-dotenv==1.2.4
+simplejson==3.20.2
+prometheus-client==0.26.0

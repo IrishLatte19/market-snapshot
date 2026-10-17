@@ -1,0 +1,11 @@
+.env
+.env.*
+.venv
+.git
+.pytest_cache
+**/__pycache__
+graphify-out
+notes
+docs
+data
+logs

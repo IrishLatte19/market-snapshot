@@ -1,0 +1,22 @@
+# Local credentials (keep the safe template)
+.env
+.env.*
+!.env.example
+
+# Python environment and caches
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Personal documentation and generated development output
+notes/
+docs/
+graphify-out/
+
+# Collected data and logs
+data/
+logs/
+
+# macOS metadata
+.DS_Store

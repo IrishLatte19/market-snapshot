@@ -1,0 +1,113 @@
+name: trustwallet-takehome
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: market_etl
+      POSTGRES_PASSWORD: local_demo_password
+      POSTGRES_DB: market_etl
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/01-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U market_etl -d market_etl"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    stop_grace_period: 10s
+  worker:
+    build: .
+    image: trustwallet-takehome-app
+    command: ["--run", "--metrics-host", "0.0.0.0"]
+    profiles: [worker]
+    environment:
+      DATABASE_URL: postgresql://market_etl:local_demo_password@postgres:5432/market_etl?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  init:
+    build: .
+    image: trustwallet-takehome-app
+    profiles: [worker]
+    command: ["--init-db"]
+    environment:
+      DATABASE_URL: postgresql://market_etl:local_demo_password@postgres:5432/market_etl?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+  downstream:
+    build: .
+    image: trustwallet-takehome-app
+    profiles: [worker]
+    command: ["--process", "--metrics-host", "0.0.0.0", "--metrics-port", "8000"]
+    environment:
+      DATABASE_URL: postgresql://market_etl:local_demo_password@postgres:5432/market_etl?sslmode=disable
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "127.0.0.1:8001:8000"
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    profiles: [monitoring]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=512MB
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:13.2.4
+    profiles: [monitoring]
+    environment:
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/pipeline.json
+    depends_on:
+      prometheus:
+        condition: service_started
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
